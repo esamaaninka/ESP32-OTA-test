@@ -5,6 +5,9 @@ https://randomnerdtutorials.com/esp32-ota-over-the-air-vs-code/
 Notes:
 - after build, browse to the ESP32 webpage http://192.168.1.110/update and load the firmware.bin from
 project C:\Users\ett18304\Documents\coding\ESP32-OTA-test\ESP32-OTA-test\.pio\build\esp32doit-devkit-v1\firmware.bin
+Note! with McUbuntu the hidden folders not visible with the browser upload.
+
+WLAN Newtwork  currently only Pajaranta
 
 My Generic Notes about ESP32 development.
 

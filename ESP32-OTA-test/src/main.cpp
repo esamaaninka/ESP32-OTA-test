@@ -37,7 +37,7 @@ void setup(void) {
   Serial.println(WiFi.localIP());
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", "No Halloo! I am ESP32.");
+    request->send(200, "text/plain", "No Halloota! I am ESP32.");
   });
 
   AsyncElegantOTA.begin(&server);    // Start ElegantOTA
