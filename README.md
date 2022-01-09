@@ -21,3 +21,9 @@ Serial Monitor and build upload:
 - VSC serial monitor does not work, 
     - sometimes got it to work with external /opt/CoolTermLinux/CoolTerm 
 
+
+VSC with Arduino extensions:
+(c++, programmer: AVR ISP, board: DOIT ESP32 DEVKIT V1,/dev/ttyUSB0 )
+
+[Warning] Output path is not specified. Unable to reuse previously compiled files. Verify could be slow.
+-> vaikka laitoin .vscode/arduino.json output parametriksi "../build" ei toimi
