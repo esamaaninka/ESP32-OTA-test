@@ -17,6 +17,7 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
+#include <WebSerial.h>
 
 // Replace with your network credentials
 const char* ssid = "Pajaranta";
@@ -157,11 +158,30 @@ void notifyClients() {
   ws.textAll(String(ledState));
 }
 
+/* Message callback of WebSerial */
+void recvMsg(uint8_t *data, size_t len){
+  WebSerial.println("Received Data...");
+  String d = "";
+  for(int i=0; i < len; i++){
+    d += char(data[i]);
+  }
+  WebSerial.println(d);
+  
+  // TÄMÄ *EI TOIMI
+  if(d == "ON"){
+    digitalWrite( ledPin, HIGH);
+  }
+  if(d == "OFF"){
+    digitalWrite( ledPin, LOW);
+  }
+}
+
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   AwsFrameInfo *info = (AwsFrameInfo*)arg;
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
     data[len] = 0;
     if (strcmp((char*)data, "toggle") == 0) {
+      WebSerial.println("Switching led state");
       ledState = !ledState;
       notifyClients();
     }
@@ -179,6 +199,8 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
       break;
     case WS_EVT_DATA:
       handleWebSocketMessage(arg, data, len);
+      WebSerial.print("Hello ");
+      WebSerial.println((char*)data);
       break;
     case WS_EVT_PONG:
     case WS_EVT_ERROR:
@@ -230,6 +252,12 @@ void setup(){
 
   // Start ElegantOTA
   AsyncElegantOTA.begin(&server);
+
+   // WebSerial is accessible at "<IP Address>/webserial" in browser
+    WebSerial.begin(&server);
+    /* Attach Message Callback */
+    WebSerial.msgCallback(recvMsg);
+
   // Start server
   server.begin();
 }
