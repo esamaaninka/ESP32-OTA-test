@@ -18,6 +18,7 @@
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
 #include <WebSerial.h>
+#include "OTA-webserver-page.h"
 
 // Replace with your network credentials
 const char* ssid = "Pajaranta";
@@ -30,6 +31,7 @@ const int ledPin = 2;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
+/*
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML><html>
 <head>
@@ -85,7 +87,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     user-select: none;
     -webkit-tap-highlight-color: rgba(0,0,0,0);
    }
-   /*.button:hover {background-color: #0f8b8d}*/
+   //.button:hover {background-color: #0f8b8d}
    .button:active {
      background-color: #0f8b8d;
      box-shadow: 2 2px #CDCDCD;
@@ -153,6 +155,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 </script>
 </body>
 </html>)rawliteral";
+*/
 
 void notifyClients() {
   ws.textAll(String(ledState));
@@ -249,6 +252,8 @@ void setup(){
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/html", index_html, processor);
   });
+
+  // route for DHT22 temp and hum
 
   // Start ElegantOTA
   AsyncElegantOTA.begin(&server);
