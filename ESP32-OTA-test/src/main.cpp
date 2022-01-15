@@ -19,6 +19,15 @@
 #include <AsyncElegantOTA.h>
 #include <WebSerial.h>
 #include "OTA-webserver-page.h"
+#include "DHT-webpage.h"
+
+#include <Adafruit_Sensor.h>
+#include <DHT.h>
+
+#define DHTPIN 27     // Digital pin connected to the DHT sensor
+#define DHTTYPE    DHT22     // DHT 22 (AM2302)
+
+DHT dht(DHTPIN, DHTTYPE);
 
 // Replace with your network credentials
 const char* ssid = "Pajaranta";
@@ -157,6 +166,36 @@ const char index_html[] PROGMEM = R"rawliteral(
 </html>)rawliteral";
 */
 
+String readDHTTemperature() {
+  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+  // Read temperature as Celsius (the default)
+  float t = dht.readTemperature();
+  // Read temperature as Fahrenheit (isFahrenheit = true)
+  //float t = dht.readTemperature(true);
+  // Check if any reads failed and exit early (to try again).
+  if (isnan(t)) {    
+    WebSerial.println("Failed to read from DHT sensor!");
+    return "--";
+  }
+  else {
+    WebSerial.println(t);
+    return String(t);
+  }
+}
+
+String readDHTHumidity() {
+  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+  float h = dht.readHumidity();
+  if (isnan(h)) {
+    WebSerial.println("Failed to read from DHT sensor!");
+    return "--";
+  }
+  else {
+    WebSerial.println(h);
+    return String(h);
+  }
+}
+
 void notifyClients() {
   ws.textAll(String(ledState));
 }
@@ -226,12 +265,22 @@ String processor(const String& var){
       return "OFF";
     }
   }
+   if(var == "TEMPERATURE"){
+    return readDHTTemperature();
+    //return "22";
+  }
+  if(var == "HUMIDITY"){
+    return readDHTHumidity();
+    //return "33";
+  }
   return String();
 }
 
 void setup(){
   // Serial port for debugging purposes
   Serial.begin(115200);
+
+  dht.begin();
 
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, LOW);
@@ -254,6 +303,15 @@ void setup(){
   });
 
   // route for DHT22 temp and hum
+  server.on("/dht", HTTP_GET,[](AsyncWebServerRequest *request){
+    request->send_P(200, "text/html",  index_dht_html, processor);
+  });
+  server.on("/temperature", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send_P(200, "text/plain", readDHTTemperature().c_str());
+  });
+  server.on("/humidity", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send_P(200, "text/plain", readDHTHumidity().c_str());
+  });
 
   // Start ElegantOTA
   AsyncElegantOTA.begin(&server);
