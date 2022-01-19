@@ -20,9 +20,16 @@
 #include <WebSerial.h>
 #include "OTA-webserver-page.h"
 #include "DHT-webpage.h"
-
+#include <string.h>
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
+#include "HX711.h"
+
+// HX711 circuit wiring
+const int LOADCELL_DOUT_PIN = 21;
+const int LOADCELL_SCK_PIN = 19;
+
+HX711 scale;
 
 #define DHTPIN 27     // Digital pin connected to the DHT sensor
 #define DHTTYPE    DHT22     // DHT 22 (AM2302)
@@ -196,6 +203,19 @@ String readDHTHumidity() {
   }
 }
 
+String readHX711Scale(){
+   if (scale.is_ready()) {
+    long reading = scale.read();
+    
+    WebSerial.print("HX711 reading: ");
+    WebSerial.println((float)reading);
+    return String(reading);
+  } else {
+    WebSerial.println("HX711 not found.");
+    return String("--");
+  }
+}
+
 void notifyClients() {
   ws.textAll(String(ledState));
 }
@@ -285,6 +305,8 @@ void setup(){
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, LOW);
   
+  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+
   // Connect to Wi-Fi
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
@@ -304,6 +326,7 @@ void setup(){
 
   // route for DHT22 temp and hum
   server.on("/dht", HTTP_GET,[](AsyncWebServerRequest *request){
+    WebSerial.println("Temp/hum via dht-processor");
     request->send_P(200, "text/html",  index_dht_html, processor);
   });
   server.on("/temperature", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -311,6 +334,10 @@ void setup(){
   });
   server.on("/humidity", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/plain", readDHTHumidity().c_str());
+  });
+
+  server.on("/scale", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", readHX711Scale().c_str());
   });
 
   // Start ElegantOTA
