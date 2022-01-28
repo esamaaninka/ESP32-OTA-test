@@ -47,132 +47,6 @@ const int ledPin = 2;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
-/*
-const char index_html[] PROGMEM = R"rawliteral(
-<!DOCTYPE HTML><html>
-<head>
-  <title>ESP Web Server</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" href="data:,">
-  <style>
-  html {
-    font-family: Arial, Helvetica, sans-serif;
-    text-align: center;
-  }
-  h1 {
-    font-size: 1.8rem;
-    color: white;
-  }
-  h2{
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #143642;
-  }
-  .topnav {
-    overflow: hidden;
-    background-color: #143642;
-  }
-  body {
-    margin: 0;
-  }
-  .content {
-    padding: 30px;
-    max-width: 600px;
-    margin: 0 auto;
-  }
-  .card {
-    background-color: #F8F7F9;;
-    box-shadow: 2px 2px 12px 1px rgba(140,140,140,.5);
-    padding-top:10px;
-    padding-bottom:20px;
-  }
-  .button {
-    padding: 15px 50px;
-    font-size: 24px;
-    text-align: center;
-    outline: none;
-    color: #fff;
-    background-color: #0f8b8d;
-    border: none;
-    border-radius: 5px;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -khtml-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    -webkit-tap-highlight-color: rgba(0,0,0,0);
-   }
-   //.button:hover {background-color: #0f8b8d}
-   .button:active {
-     background-color: #0f8b8d;
-     box-shadow: 2 2px #CDCDCD;
-     transform: translateY(2px);
-   }
-   .state {
-     font-size: 1.5rem;
-     color:#8c8c8c;
-     font-weight: bold;
-   }
-  </style>
-<title>ESP Web Server</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:,">
-</head>
-<body>
-  <div class="topnav">
-    <h1>ESP WebSocket Server</h1>
-  </div>
-  <div class="content">
-    <div class="card">
-      <h2>Output - GPIO 2</h2>
-      <p class="state">state: <span id="state">%STATE%</span></p>
-      <p><button id="button" class="button">Toggle</button></p>
-    </div>
-  </div>
-<script>
-  var gateway = `ws://${window.location.hostname}/ws`;
-  var websocket;
-  window.addEventListener('load', onLoad);
-  function initWebSocket() {
-    console.log('Trying to open a WebSocket connection...');
-    websocket = new WebSocket(gateway);
-    websocket.onopen    = onOpen;
-    websocket.onclose   = onClose;
-    websocket.onmessage = onMessage; // <-- add this line
-  }
-  function onOpen(event) {
-    console.log('Connection opened');
-  }
-  function onClose(event) {
-    console.log('Connection closed');
-    setTimeout(initWebSocket, 2000);
-  }
-  function onMessage(event) {
-    var state;
-    if (event.data == "1"){
-      state = "ON";
-    }
-    else{
-      state = "OFF";
-    }
-    document.getElementById('state').innerHTML = state;
-  }
-  function onLoad(event) {
-    initWebSocket();
-    initButton();
-  }
-  function initButton() {
-    document.getElementById('button').addEventListener('click', toggle);
-  }
-  function toggle(){
-    websocket.send('toggle');
-  }
-</script>
-</body>
-</html>)rawliteral";
-*/
-
 String readDHTTemperature() {
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
   // Read temperature as Celsius (the default)
@@ -185,6 +59,7 @@ String readDHTTemperature() {
     return "--";
   }
   else {
+    WebSerial.print("DHT722 temperature read: ");
     WebSerial.println(t);
     return String(t);
   }
@@ -198,6 +73,7 @@ String readDHTHumidity() {
     return "--";
   }
   else {
+    WebSerial.print("DHT22 humidity read:");
     WebSerial.println(h);
     return String(h);
   }
@@ -214,6 +90,13 @@ String readHX711Scale(){
     WebSerial.println("HX711 not found.");
     return String("--");
   }
+}
+
+String setHX711Scale(){
+  WebSerial.println("Set the scale calibration.");
+  WebSerial.println("Set know weight on the scale.");
+  WebSerial.println("Input the weight.");
+  return "setHX711Scale";
 }
 
 void notifyClients() {
@@ -338,6 +221,10 @@ void setup(){
 
   server.on("/scale", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/plain", readHX711Scale().c_str());
+  });
+
+  server.on("/set-scale", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", setHX711Scale().c_str());
   });
 
   // Start ElegantOTA
