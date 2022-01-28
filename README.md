@@ -11,18 +11,18 @@ WLAN Newtwork  currently only Pajaranta
 
 
 API
-/   toggle button to turn on/off internal led
+/               page toggle button to turn on/off internal led
 
-/update     page to load updated firmware
+/update         page to load updated firmware
 
-/dht shows graphical temp/hum page
-/temperature  returns temp as text
-/humidity       returns humidity as text
+/dht            page to shows graphical temp/hum gauges
+/temperature    returns temp as string
+/humidity       returns humidity as string
 
-/webserial      opens serial console in browser
+/webserial      page with serial console in browser
 https://github.com/ayushsharma82/WebSerial
 
-/scale      returns HX711 reading as String
+/scale          returns HX711 reading as String
 https://registry.platformio.org/libraries/bogde/HX711/examples/HX711_basic_example/HX711_basic_example.ino
 
 
