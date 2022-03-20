@@ -14,28 +14,79 @@
 // Import required libraries
 #include <Arduino.h>
 #include <WiFi.h>
+#include "SPIFFS.h"
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <AsyncElegantOTA.h>
-#include <WebSerial.h>
+//#include <Serial.h>
 #include "OTA-webserver-page.h"
 #include "DHT-webpage.h"
 #include <string.h>
 #include <Adafruit_Sensor.h>
-#include <DHT.h>
-#include "HX711.h"
+#include "mydht.h"
+#include "myhx711.h"
+#include <PubSubClient.h>
 
+// MQTT Broker
+//const char *mqtt_broker = "broker.emqx.io";
+const char *mqtt_broker = "192.168.164.62";
+const char *topic = "esp32/test";
+//const char *mqtt_username = "emqx";
+//const char *mqtt_password = "public";
+const int mqtt_port = 1883;
+
+WiFiClient espClient;
+PubSubClient mqtt_client(espClient);
+
+void callback(char *topic, byte *payload, unsigned int length) {
+ Serial.print("Message arrived in topic: ");
+ Serial.println(topic);
+ Serial.print("Message:");
+ 
+ String messageTemp;
+
+ for (int i = 0; i < length; i++) {
+     Serial.print((char) payload[i]);
+     messageTemp += (char)payload[i];
+ }
+ Serial.println();
+ Serial.println("-----------------------");
+
+ // If a message is received on the topic esp32/output, you check if the message is either "on" or "off". 
+  // Changes the output state according to the message
+  /*
+  if (String(topic) == "esp32/output") {
+    Serial.print("Changing output to ");
+    if(messageTemp == "on"){
+      Serial.println("on");
+      digitalWrite(ledPin, HIGH);
+    }
+    else if(messageTemp == "off"){
+      Serial.println("off");
+      digitalWrite(ledPin, LOW);
+    }
+  }
+  */
+}
+// Function that gets current epoch time
+unsigned long getTime() {
+  time_t now;
+  struct tm timeinfo;
+  if (!getLocalTime(&timeinfo)) {
+    //Serial.println("Failed to obtain time");
+    return(0);
+  }
+  time(&now);
+  return now;
+}
+
+/*
 // HX711 circuit wiring
 const int LOADCELL_DOUT_PIN = 21;
 const int LOADCELL_SCK_PIN = 19;
 
 HX711 scale;
-
-#define DHTPIN 27     // Digital pin connected to the DHT sensor
-#define DHTTYPE    DHT22     // DHT 22 (AM2302)
-
-DHT dht(DHTPIN, DHTTYPE);
-
+*/
 // Replace with your network credentials
 const char* ssid = "Pajaranta";
 const char* password = "Perttulintie7C";
@@ -47,6 +98,7 @@ const int ledPin = 2;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
+/*
 String readDHTTemperature() {
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
   // Read temperature as Celsius (the default)
@@ -55,12 +107,12 @@ String readDHTTemperature() {
   //float t = dht.readTemperature(true);
   // Check if any reads failed and exit early (to try again).
   if (isnan(t)) {    
-    WebSerial.println("Failed to read from DHT sensor!");
+    Serial.println("Failed to read from DHT sensor!");
     return "--";
   }
   else {
-    WebSerial.print("DHT722 temperature read: ");
-    WebSerial.println(t);
+    Serial.print("DHT722 temperature read: ");
+    Serial.println(t);
     return String(t);
   }
 }
@@ -69,48 +121,59 @@ String readDHTHumidity() {
   // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
   float h = dht.readHumidity();
   if (isnan(h)) {
-    WebSerial.println("Failed to read from DHT sensor!");
+    Serial.println("Failed to read from DHT sensor!");
     return "--";
   }
   else {
-    WebSerial.print("DHT22 humidity read:");
-    WebSerial.println(h);
+    Serial.print("DHT22 humidity read:");
+    Serial.println(h);
     return String(h);
   }
 }
-
-String readHX711Scale(){
+*/
+/*String readHX711Scale(){
    if (scale.is_ready()) {
     long reading = scale.read();
     
-    WebSerial.print("HX711 reading: ");
-    WebSerial.println((float)reading);
+    Serial.print("HX711 reading: ");
+    Serial.println((float)reading);
     return String(reading);
   } else {
-    WebSerial.println("HX711 not found.");
+    Serial.println("HX711 not found.");
     return String("--");
   }
 }
 
 String setHX711Scale(){
-  WebSerial.println("Set the scale calibration.");
-  WebSerial.println("Set know weight on the scale.");
-  WebSerial.println("Input the weight.");
+  Serial.println("Set the scale calibration.");
+  Serial.println("Set know weight on the scale.");
+  Serial.println("Input the weight.");
   return "setHX711Scale";
+}
+*/
+void send_measurements(){
+  char message[80]; // tarkista pituus mikä max tarvitaan
+  //char *message_chr;
+  
+  sprintf(message, "ESP32 temp %s, humidity %s, weight %s", readDHTTemperature(), readDHTHumidity(), readHX711Scale());
+  Serial.println("Send measurements via MQTT");
+  Serial.println(message);
+  mqtt_client.publish(topic,"sending measurements");
+  mqtt_client.publish(topic, &message[0]); // vai pelkkä message
 }
 
 void notifyClients() {
   ws.textAll(String(ledState));
 }
 
-/* Message callback of WebSerial */
+/* Message callback of Serial */
 void recvMsg(uint8_t *data, size_t len){
-  WebSerial.println("Received Data...");
+  Serial.println("Received Data...");
   String d = "";
   for(int i=0; i < len; i++){
     d += char(data[i]);
   }
-  WebSerial.println(d);
+  Serial.println(d);
   
   // TÄMÄ *EI TOIMI
   if(d == "ON"){
@@ -126,7 +189,7 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
   if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
     data[len] = 0;
     if (strcmp((char*)data, "toggle") == 0) {
-      WebSerial.println("Switching led state");
+      Serial.println("Switching led state");
       ledState = !ledState;
       notifyClients();
     }
@@ -144,8 +207,8 @@ void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType 
       break;
     case WS_EVT_DATA:
       handleWebSocketMessage(arg, data, len);
-      WebSerial.print("Hello ");
-      WebSerial.println((char*)data);
+      Serial.print("Hello ");
+      Serial.println((char*)data);
       break;
     case WS_EVT_PONG:
     case WS_EVT_ERROR:
@@ -183,12 +246,20 @@ void setup(){
   // Serial port for debugging purposes
   Serial.begin(115200);
 
-  dht.begin();
+  // Initialize SPIFFS
+  if(!SPIFFS.begin(true)){
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    return;
+  }
+
+  //dht.begin();
+  setupDHT();
 
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, LOW);
   
-  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+  setupScale();
+  //scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
 
   // Connect to Wi-Fi
   WiFi.begin(ssid, password);
@@ -202,14 +273,47 @@ void setup(){
 
   initWebSocket();
 
-  // Route for root / web page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+  // MQTT setup
+  mqtt_client.setServer(mqtt_broker, mqtt_port);
+  mqtt_client.setCallback(callback);
+  while (!mqtt_client.connected()) {
+     String client_id = "esp32-client-";
+     client_id += String(WiFi.macAddress());
+     Serial.printf("The client %s connects to the public mqtt broker\n", client_id.c_str());
+     //if (mqtt_client.connect(client_id.c_str(), mqtt_username, mqtt_password)) {
+       if (mqtt_client.connect(client_id.c_str())) {
+     //if (mqtt_client.connect()) {
+         Serial.println("mqtt broker connected");
+         mqtt_client.publish(topic,"ESP32 here gossiping");
+         mqtt_client.subscribe(topic);
+         //Serial.println("mqtt broker connected");
+     } else {
+         //Serial.print("mqtt failed with state ");
+         Serial.print("mqtt failed with state ");
+         //Serial.print(mqtt_client.state());
+         Serial.print(mqtt_client.state());
+         delay(2000);
+     }
+ }
+
+
+  // Route for root / web page index page in /include *.h
+  server.on("/ota", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send_P(200, "text/html", index_html, processor);
+  });
+  // Route for root / web page index.html in SPIFFS 
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    Serial.println("yritetään lukea SPIFSS:stä index sivu");
+    request->send(SPIFFS, "/index.html", String(), false, processor);
+  });
+    // Route to load style.css file
+  server.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/style.css", "text/css");
   });
 
   // route for DHT22 temp and hum
   server.on("/dht", HTTP_GET,[](AsyncWebServerRequest *request){
-    WebSerial.println("Temp/hum via dht-processor");
+    Serial.println("Temp/hum via dht-processor");
     request->send_P(200, "text/html",  index_dht_html, processor);
   });
   server.on("/temperature", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -230,10 +334,10 @@ void setup(){
   // Start ElegantOTA
   AsyncElegantOTA.begin(&server);
 
-   // WebSerial is accessible at "<IP Address>/webserial" in browser
-    WebSerial.begin(&server);
+   // Serial is accessible at "<IP Address>/Serial" in browser
+    //Serial.begin(&server);
     /* Attach Message Callback */
-    WebSerial.msgCallback(recvMsg);
+    //Serial.msgCallback(recvMsg);
 
   // Start server
   server.begin();
@@ -242,4 +346,8 @@ void setup(){
 void loop() {
   ws.cleanupClients();
   digitalWrite(ledPin, ledState);
+  mqtt_client.loop();
+  mqtt_client.publish(topic,"esp32 loop message");
+  send_measurements();
+  delay(10000);
 }
