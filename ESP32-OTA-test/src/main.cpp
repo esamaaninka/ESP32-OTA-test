@@ -25,49 +25,9 @@
 #include <Adafruit_Sensor.h>
 #include "mydht.h"
 #include "myhx711.h"
-#include <PubSubClient.h>
+#include "mymqtt.h"
+#include "my_wifi.h"
 
-// MQTT Broker
-//const char *mqtt_broker = "broker.emqx.io";
-const char *mqtt_broker = "192.168.164.62";
-const char *topic = "esp32/test";
-//const char *mqtt_username = "emqx";
-//const char *mqtt_password = "public";
-const int mqtt_port = 1883;
-
-WiFiClient espClient;
-PubSubClient mqtt_client(espClient);
-
-void callback(char *topic, byte *payload, unsigned int length) {
- Serial.print("Message arrived in topic: ");
- Serial.println(topic);
- Serial.print("Message:");
- 
- String messageTemp;
-
- for (int i = 0; i < length; i++) {
-     Serial.print((char) payload[i]);
-     messageTemp += (char)payload[i];
- }
- Serial.println();
- Serial.println("-----------------------");
-
- // If a message is received on the topic esp32/output, you check if the message is either "on" or "off". 
-  // Changes the output state according to the message
-  /*
-  if (String(topic) == "esp32/output") {
-    Serial.print("Changing output to ");
-    if(messageTemp == "on"){
-      Serial.println("on");
-      digitalWrite(ledPin, HIGH);
-    }
-    else if(messageTemp == "off"){
-      Serial.println("off");
-      digitalWrite(ledPin, LOW);
-    }
-  }
-  */
-}
 // Function that gets current epoch time
 unsigned long getTime() {
   time_t now;
@@ -80,16 +40,10 @@ unsigned long getTime() {
   return now;
 }
 
-/*
-// HX711 circuit wiring
-const int LOADCELL_DOUT_PIN = 21;
-const int LOADCELL_SCK_PIN = 19;
 
-HX711 scale;
-*/
 // Replace with your network credentials
-const char* ssid = "Pajaranta";
-const char* password = "Perttulintie7C";
+//const char* ssid = "Pajaranta";
+//const char* password = "Perttulintie7C";
 
 bool ledState = 0;
 const int ledPin = 2;
@@ -98,59 +52,7 @@ const int ledPin = 2;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
-/*
-String readDHTTemperature() {
-  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-  // Read temperature as Celsius (the default)
-  float t = dht.readTemperature();
-  // Read temperature as Fahrenheit (isFahrenheit = true)
-  //float t = dht.readTemperature(true);
-  // Check if any reads failed and exit early (to try again).
-  if (isnan(t)) {    
-    Serial.println("Failed to read from DHT sensor!");
-    return "--";
-  }
-  else {
-    Serial.print("DHT722 temperature read: ");
-    Serial.println(t);
-    return String(t);
-  }
-}
 
-String readDHTHumidity() {
-  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-  float h = dht.readHumidity();
-  if (isnan(h)) {
-    Serial.println("Failed to read from DHT sensor!");
-    return "--";
-  }
-  else {
-    Serial.print("DHT22 humidity read:");
-    Serial.println(h);
-    return String(h);
-  }
-}
-*/
-/*String readHX711Scale(){
-   if (scale.is_ready()) {
-    long reading = scale.read();
-    
-    Serial.print("HX711 reading: ");
-    Serial.println((float)reading);
-    return String(reading);
-  } else {
-    Serial.println("HX711 not found.");
-    return String("--");
-  }
-}
-
-String setHX711Scale(){
-  Serial.println("Set the scale calibration.");
-  Serial.println("Set know weight on the scale.");
-  Serial.println("Input the weight.");
-  return "setHX711Scale";
-}
-*/
 void send_measurements(){
   char message[80]; // tarkista pituus mikä max tarvitaan
   //char *message_chr;
@@ -158,8 +60,10 @@ void send_measurements(){
   sprintf(message, "ESP32 temp %s, humidity %s, weight %s", readDHTTemperature(), readDHTHumidity(), readHX711Scale());
   Serial.println("Send measurements via MQTT");
   Serial.println(message);
-  mqtt_client.publish(topic,"sending measurements");
-  mqtt_client.publish(topic, &message[0]); // vai pelkkä message
+  /*my_mqtt_client.publish(topic,"sending measurements");
+  my_mqtt_client.publish(topic, &message[0]); // vai pelkkä message
+  */
+
 }
 
 void notifyClients() {
@@ -251,51 +155,16 @@ void setup(){
     Serial.println("An Error has occurred while mounting SPIFFS");
     return;
   }
-
-  //dht.begin();
   setupDHT();
+  setupScale();
+  setup_myWifi();
+  setup_my_mqtt();
 
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, LOW);
   
-  setupScale();
-  //scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-
-  // Connect to Wi-Fi
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.println("Connecting to WiFi..");
-  }
-
-  // Print ESP Local IP Address
-  Serial.println(WiFi.localIP());
-
   initWebSocket();
-
-  // MQTT setup
-  mqtt_client.setServer(mqtt_broker, mqtt_port);
-  mqtt_client.setCallback(callback);
-  while (!mqtt_client.connected()) {
-     String client_id = "esp32-client-";
-     client_id += String(WiFi.macAddress());
-     Serial.printf("The client %s connects to the public mqtt broker\n", client_id.c_str());
-     //if (mqtt_client.connect(client_id.c_str(), mqtt_username, mqtt_password)) {
-       if (mqtt_client.connect(client_id.c_str())) {
-     //if (mqtt_client.connect()) {
-         Serial.println("mqtt broker connected");
-         mqtt_client.publish(topic,"ESP32 here gossiping");
-         mqtt_client.subscribe(topic);
-         //Serial.println("mqtt broker connected");
-     } else {
-         //Serial.print("mqtt failed with state ");
-         Serial.print("mqtt failed with state ");
-         //Serial.print(mqtt_client.state());
-         Serial.print(mqtt_client.state());
-         delay(2000);
-     }
- }
-
+ 
 
   // Route for root / web page index page in /include *.h
   server.on("/ota", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -346,8 +215,8 @@ void setup(){
 void loop() {
   ws.cleanupClients();
   digitalWrite(ledPin, ledState);
-  mqtt_client.loop();
-  mqtt_client.publish(topic,"esp32 loop message");
+  //my_mqtt_client.loop();
+  //my_mqtt_client.publish(topic,"esp32 loop message");
   send_measurements();
   delay(10000);
 }
